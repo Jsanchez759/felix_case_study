@@ -1,104 +1,131 @@
-# Send Money Agent - Production Grade Implementation
+# Send Money Agent – Google ADK Implementation
 
-A conversational AI agent built with Google ADK that helps users send money internationally by collecting transfer details through natural conversation.
+A conversational AI agent built with **Google ADK** that guides users through the process of sending money internationally by collecting transfer details naturally.  
+The agent extracts key information, validates business rules, tracks progress across the session, and generates a complete transfer summary.
 
-## Features
+## ✨ Features
 
-- **Natural Language Processing**: Extracts transfer information from conversational input
-- **Step-by-Step Guidance**: Asks for missing information one piece at a time
-- **Validation**: Validates all transfer details against business rules
-- **Corrections**: Allows users to update or correct information
-- **State Management**: Maintains conversation state across multiple turns
-- **Production Ready**: Clean architecture with proper error handling
+- **Conversational Extraction**: Identifies amount, currency, country, delivery method, and recipient name from free-form user input.
+- **Progressive Data Gathering**: Detects missing fields and asks targeted follow-up questions.
+- **Business Rule Validation**: Ensures input matches configured limits, allowed currencies, countries, and delivery methods.
+- **Stateful Conversations**: Stores transfer state in ADK’s session storage across multiple turns.
+- **Corrections Supported**: Users can update any detail at any point.
+- **Readable Summaries**: Generates a clean confirmation summary when complete.
+- **Production-Ready Tools**: Clear separation between LLM behavior and deterministic Python logic.
 
-## Architecture
+## 📁 Project Structure
 
-```
 send_money_agent/
-├── agent.py          # Main agent with LLM integration
-├── tools.py          # ADK tools for validation and summaries
-├── config.py         # Configuration constants
-├── config.yaml       # YAML configuration
-├── utils.py          # Utility functions
-└── exceptions.py     # Custom exceptions
-```
+├── agent.py # Main ADK agent with LLM instructions and callbacks
+├── tools.py # Extraction, validation, completeness checks, summary generation
+├── config_loader.py # Loads config.yaml into memory
+└── config.yaml # Business rules (countries, currencies, limits, methods)
 
-## Key Components
+## 🧠 Key Components
 
-### 1. TransferDetails Model
-- Tracks all transfer information (amount, currency, recipient, etc.)
-- Provides completion status and missing field detection
-- Generates human-readable summaries
+### 1. **Transfer State (ADK Session State)**  
+The agent maintains a persistent state across turns including:
 
-### 2. TransferProcessor
-- Extracts information from natural language input using regex
-- Validates extracted data against business rules
-- Handles corrections and updates
+- `amount`
+- `currency`
+- `recipient_name`
+- `recipient_country`
+- `delivery_method`
+- `purpose`
+- `status`
+- `is_complete`
+- `completion_percentage`
+- `conversation_turns`
+- `ready_for_confirmation`
 
-### 3. SendMoneyState
-- Manages conversation state
-- Processes user input and generates appropriate responses
-- Integrates with the LLM for natural conversation flow
+Tools update this state directly through `tool_context.state`.
 
-### 4. ADK Tools
-- `TransferValidationTool`: Validates complete transfer details
-- `TransferSummaryTool`: Generates formatted summaries
+---
 
-## Supported Features
+### 2. **Extraction Logic (`extract_and_update_transfer`)**
+- Parses free-form text using regex and keyword matching.
+- Updates state with any detected fields.
+- Increments conversation turn count.
+- Returns structured extraction results for the LLM to interpret.
 
-- **Countries**: USA, Mexico, Canada, UK, Spain, France, Germany, Italy, Brazil, Argentina, Colombia
-- **Currencies**: USD, EUR, GBP, MXN, CAD, BRL, ARS, COP
-- **Delivery Methods**: Bank transfer, Cash pickup, Mobile wallet, Home delivery
-- **Amount Limits**: $1 - $10,000 USD
+Extracts:
 
-## Usage
+- Numeric amounts (`500`, `$1,000.50`, etc.)
+- Currencies by keyword or symbol
+- Countries from config list
+- Delivery methods (`bank_transfer`, `cash_pickup`, `mobile_wallet`, `home_delivery`)
+- Recipient names (`"to Maria Lopez"`)
 
-```python
-from send_money_agent.agent import send_money_agent, SendMoneyState
+### 3. **Validation (`validate_current_transfer`)**
+Checks each populated field against rules in `config.yaml`:
 
-# Initialize state
-state = SendMoneyState()
+- Amount within `min_amount` and `max_amount`
+- Supported currency
+- Allowed country
+- Delivery method permitted
 
-# Process user input
-response = state.process_input("I want to send $500 to Maria in Mexico")
-print(response)  # "Got it! $500. Which country are you sending to?"
+Returns:
+- `is_valid: true/false`
+- `errors: [...]`
 
-# Continue conversation
-response = state.process_input("Cash pickup please")
-print(response)  # Shows complete transfer summary
-```
+### 4. **Completeness (`check_transfer_completeness`)**
+Determines if the required fields are present:
 
-## Example Conversation
+- amount  
+- currency  
+- recipient_name  
+- recipient_country  
+- delivery_method  
 
-```
-User: I want to send money
-Agent: How much would you like to send?
+Also writes to state:
 
-User: $500 USD to Maria Garcia in Mexico
-Agent: Got it! $500 in USD to Maria Garcia to Mexico. How should they receive it?
+- `is_complete`
+- `completion_percentage`
+- `missing_fields`
 
-User: Cash pickup
-Agent: Perfect! Here's your transfer summary:
+---
+
+### 5. **Summary Generation (`generate_transfer_summary`)**
+Creates a user-friendly summary:
 💰 Amount: USD 500.00
 👤 Recipient: Maria Garcia
 🌍 Destination: Mexico
 📦 Delivery: Cash Pickup
+📝 Purpose: (optional)
 
-Ready to send!
-```
 
-## Design Principles
+Updates state:
 
-1. **LLM Handles Conversation**: The LLM manages natural language understanding and response generation
-2. **Code Handles Logic**: Business rules, validation, and state management in code
-3. **Minimal Complexity**: Simple, focused implementation without over-engineering
-4. **Production Ready**: Proper error handling, validation, and clean architecture
-5. **Extensible**: Easy to add new countries, currencies, or delivery methods
+- `ready_for_confirmation = True`
 
-## Running the Demo
+## 🌍 Supported Features (Configured via YAML)
 
-```bash
-python main.py
-```
+- **Countries**: From `supported_countries`
+- **Currencies**: From `supported_currencies`
+- **Delivery Methods**: From `delivery_methods`
+- **Amount Limits**: From `transfer_limits.min_amount` and `.max_amount`
 
-This will run a demonstration showing the agent collecting transfer details through a simulated conversation.
+All values are easily modifiable without touching code.
+
+
+## 🧩 Design Principles
+
+- **LLM handles conversation**
+Prompts drive the dialogue; no logic is hidden inside the model.
+
+- **Python tools handle business logic**
+Extraction, validation, and state updates are deterministic and testable.
+
+- **State belongs to ADK**
+Tools mutate tool_context.state, and ADK persists deltas automatically.
+
+- **Separation of concerns**
+
+LLM = natural language
+
+Tools = logic
+
+Config = rules
+
+- **Extensibility**
+New fields, new countries, or new delivery methods require minimal changes.
