@@ -1,0 +1,38 @@
+agent:
+  name: "send_money_agent"
+  model: "gemini-2.5-flash"
+  description: "Money transfer agent for collecting transfer details"
+  temperature: 0.7
+  
+transfer_limits:
+  min_amount: 1.0
+  max_amount: 10000.0
+  
+supported_countries:
+  - "USA"
+  - "Mexico" 
+  - "Canada"
+  - "UK"
+  - "Spain"
+  - "France"
+  - "Germany"
+  - "Italy"
+  - "Brazil"
+  - "Argentina"
+  - "Colombia"
+
+supported_currencies:
+  - "USD"
+  - "EUR"
+  - "GBP"
+  - "MXN"
+  - "CAD"
+  - "BRL"
+  - "ARS"
+  - "COP"
+
+delivery_methods:
+  - "bank_transfer"
+  - "cash_pickup"
+  - "mobile_wallet"
+  - "home_delivery"
